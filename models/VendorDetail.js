@@ -14,7 +14,7 @@ const VendorDetail = sequelize.define(
       allowNull: false,
     },
     revenue: {
-      type: DataTypes.STRING,
+      type: DataTypes.JSON,
       allowNull: false,
     },
     no_of_employees: {
