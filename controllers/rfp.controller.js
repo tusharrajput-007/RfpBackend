@@ -99,8 +99,16 @@ const createRfp = async (req, res) => {
         .json({ response: "error", errors: "RFP number already exists." });
     }
 
-    // we validate last_date is future date
+    // Validate date format
     const rfpLastDate = new Date(last_date);
+    if (isNaN(rfpLastDate.getTime())) {
+      return res.status(400).json({
+        response: "error",
+        errors: "Enter a valid date in YYYY-MM-DD format.",
+      });
+    }
+
+    // Validate last_date is future date
     const today = new Date();
     if (rfpLastDate <= today) {
       return res.status(400).json({
@@ -293,6 +301,18 @@ const updateRfp = async (req, res) => {
         .json({ response: "error", errors: "RFP is closed" });
     }
 
+    // Check if any vendor has already applied
+    const quotesExist = await RfpVendor.findOne({
+      where: { rfp_id: id, applied: true },
+    });
+    if (quotesExist) {
+      return res.status(400).json({
+        response: "error",
+        errors:
+          "Cannot update RFP as quotes have already been submitted. Please create a new RFP.",
+      });
+    }
+
     // check if rfp_no already exists for a different RFP
     const existingRfp = await Rfp.findOne({ where: { rfp_no } });
     if (existingRfp && existingRfp.id !== parseInt(id)) {
@@ -301,8 +321,16 @@ const updateRfp = async (req, res) => {
         .json({ response: "error", errors: "RFP number already exists." });
     }
 
-    // we check last_date is future date
+    // Validate date format
     const rfpLastDate = new Date(last_date);
+    if (isNaN(rfpLastDate.getTime())) {
+      return res.status(400).json({
+        response: "error",
+        errors: "Enter a valid date in YYYY-MM-DD format.",
+      });
+    }
+
+    // Validate last_date is future date
     const today = new Date();
     if (rfpLastDate <= today) {
       return res.status(400).json({
@@ -384,10 +412,10 @@ const updateRfp = async (req, res) => {
           vendor.email,
           "Velocity RFP has been Updated",
           `<p>Dear ${vendor.firstname},</p>
-                    <p>An RFP has been updated and your previous quote has been reset. Please login and re-submit your quote.</p>
-                    <p>RFP Name: ${item_name}</p>
-                    <p>End Date: ${last_date}</p>
-                    <p>Thanks,<br/>Velocity RFP System</p>`,
+          <p>An RFP you were assigned to has been updated. Please login and review the new details and submit your quote.</p>
+          <p>RFP Name: ${item_name}</p>
+          <p>End Date: ${last_date}</p>
+          <p>Thanks,<br/>Velocity RFP System</p>`,
         );
       } catch (emailError) {
         console.error("Email failed for vendor:", vendor.email, emailError);

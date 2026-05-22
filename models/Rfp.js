@@ -14,7 +14,7 @@ const Rfp = sequelize.define(
       allowNull: false,
     },
     item_name: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(30),
       allowNull: false,
     },
     item_description: {
@@ -22,7 +22,7 @@ const Rfp = sequelize.define(
       allowNull: false,
     },
     rfp_no: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(20),
       allowNull: false,
       unique: true,
     },

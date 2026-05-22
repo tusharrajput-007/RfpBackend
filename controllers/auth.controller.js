@@ -59,7 +59,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, user_type: user.user_type },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" },
+      { expiresIn: process.env.JWT_EXPIRES_IN },
     );
 
     return res.status(200).json({
@@ -112,6 +112,22 @@ const registerAdmin = async (req, res) => {
       return res.status(400).json({
         response: "error",
         error: "Mobile is required",
+      });
+    }
+
+    // Format validations
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res
+        .status(400)
+        .json({ response: "error", error: "Enter valid email." });
+    }
+
+    const mobileRegex = /^[0-9]{10}$/;
+    if (!mobileRegex.test(mobile)) {
+      return res.status(400).json({
+        response: "error",
+        error: "Enter a valid 10 digit mobile no.",
       });
     }
 
@@ -224,16 +240,18 @@ const registerVendor = async (req, res) => {
 
     const mobileRegex = /^[0-9]{10}$/;
     if (!mobileRegex.test(mobile)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter a valid mobile no." });
+      return res.status(400).json({
+        response: "error",
+        error: "Enter a valid 10 digit mobile no.",
+      });
     }
 
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     if (!panRegex.test(pancard_no)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter a valid PAN card no." });
+      return res.status(400).json({
+        response: "error",
+        error: "Enter a valid 10 digit PAN card no.",
+      });
     }
 
     const gstRegex =

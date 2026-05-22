@@ -12,6 +12,7 @@ const VendorDetail = sequelize.define(
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      unique: true,
     },
     revenue: {
       type: DataTypes.JSON,
@@ -22,11 +23,11 @@ const VendorDetail = sequelize.define(
       allowNull: false,
     },
     pancard_no: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(10),
       allowNull: false,
     },
     gst_no: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(15),
       allowNull: false,
     },
     status: {

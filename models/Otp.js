@@ -10,11 +10,14 @@ const Otp = sequelize.define(
       autoIncrement: true,
     },
     email: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(30),
       allowNull: false,
+      validate: {
+        isEmail: true,
+      },
     },
     otp: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(6),
       allowNull: false,
     },
   },
