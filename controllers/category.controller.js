@@ -1,198 +1,146 @@
 const { getPagination, getPagingData } = require("../utils/pagination");
 const { Category, VendorCategory, RfpCategory } = require("../models/index");
+const { validateRequiredFields } = require("../utils/validators");
+const asyncWrapper = require("../utils/asyncWrapper");
+const AppError = require("../utils/AppError");
 
 // get all categories
-const getCategories = async (req, res) => {
-  try {
-    const { page, limit } = req.query;
-    const { limit: parsedLimit, offset } = getPagination(page, limit);
+const getCategories = asyncWrapper(async (req, res) => {
+  const { page, limit } = req.query;
+  const { limit: parsedLimit, offset } = getPagination(page, limit);
 
-    const data = await Category.findAndCountAll({
-      attributes: ["id", "name", "status"],
-      limit: parsedLimit,
-      offset,
-      order: [["createdAt", "DESC"]],
-    });
+  const data = await Category.findAndCountAll({
+    attributes: ["id", "name", "status"],
+    limit: parsedLimit,
+    offset,
+    order: [["createdAt", "DESC"]],
+  });
 
-    const response = getPagingData(data, page, parsedLimit);
+  const response = getPagingData(data, page, parsedLimit);
 
-    return res.status(200).json({
-      response: "success",
-      ...response,
-    });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
-  }
-};
+  return res.status(200).json({
+    response: "success",
+    message: "Categories fetched successfully",
+    ...response,
+  });
+});
 
 // add a category
-const addCategory = async (req, res) => {
-  try {
-    const { name } = req.body;
+const addCategory = asyncWrapper(async (req, res) => {
+  const { name } = req.body;
 
-    // Validation
-    if (!name || name.trim() === "") {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Category name is required" });
-    }
+  // Validation
+  const requiredError = validateRequiredFields({ Name: name });
+  if (requiredError) throw new AppError(requiredError, 400);
 
-    const trimmedName = name.trim();
+  const trimmedName = name.trim();
 
-    // if category already exists
-    const existingCategory = await Category.findOne({
-      where: { name: trimmedName },
-    });
-    if (existingCategory) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Category already exist" });
-    }
+  // if category already exists
+  const existingCategory = await Category.findOne({
+    where: { name: trimmedName },
+  });
+  if (existingCategory) throw new AppError("Category already exist", 400);
 
-    // create
-    await Category.create({ name: trimmedName });
+  // create
+  const category = await Category.create({ name: trimmedName });
 
-    return res.status(201).json({ response: "success" });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
-  }
-};
+  return res.status(201).json({
+    response: "success",
+    message: "Category created successfully",
+    id: category.id,
+  });
+});
 
 // delete a category
-const deleteCategory = async (req, res) => {
-  try {
-    const { id } = req.params;
+const deleteCategory = asyncWrapper(async (req, res) => {
+  const { id } = req.params;
 
-    // if category exists
-    const category = await Category.findOne({ where: { id } });
-    if (!category) {
-      return res.status(404).json({ response: "error", error: "Invalid ID" });
-    }
+  // if category exists
+  const category = await Category.findOne({ where: { id } });
+  if (!category) throw new AppError("Invalid ID", 404);
 
-    // additionals added (required)
-    // don't delete if category is used in vendor_categories
-    const vendorCategory = await VendorCategory.findOne({
-      where: { category_id: id },
-    });
-    if (vendorCategory) {
-      return res.status(400).json({
-        response: "error",
-        error: "Category is in use and cannot be deleted.",
-      });
-    }
+  // additionals added (required)
+  // don't delete if category is used in vendor_categories
+  const vendorCategory = await VendorCategory.findOne({
+    where: { category_id: id },
+  });
+  if (vendorCategory)
+    throw new AppError("Category is in use and cannot be deleted.", 400);
 
-    // don't delete if category is used in rfp_categories
-    const rfpCategory = await RfpCategory.findOne({
-      where: { category_id: id },
-    });
-    if (rfpCategory) {
-      return res.status(400).json({
-        response: "error",
-        error: "Category is in use and cannot be deleted.",
-      });
-    }
+  // don't delete if category is used in rfp_categories
+  const rfpCategory = await RfpCategory.findOne({ where: { category_id: id } });
+  if (rfpCategory)
+    throw new AppError("Category is in use and cannot be deleted.", 400);
 
-    // Delete category
-    await Category.destroy({ where: { id } });
+  // Delete category
+  await Category.destroy({ where: { id } });
 
-    return res.status(200).json({ response: "success" });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
-  }
-};
+  return res.status(200).json({
+    response: "success",
+    message: "Category deleted successfully",
+    id: parseInt(id),
+  });
+});
 
 // get category by id
-const getCategoryById = async (req, res) => {
-  try {
-    const { id } = req.params;
+const getCategoryById = asyncWrapper(async (req, res) => {
+  const { id } = req.params;
 
-    const category = await Category.findOne({
-      where: { id },
-      attributes: ["id", "name", "status"],
-    });
+  const category = await Category.findOne({
+    where: { id },
+    attributes: ["id", "name", "status"],
+  });
 
-    if (!category) {
-      return res
-        .status(404)
-        .json({ response: "error", error: "Invalid Category ID" });
-    }
+  if (!category) throw new AppError("Invalid Category ID", 404);
 
-    return res.status(200).json({
-      response: "success",
-      category,
-    });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
-  }
-};
+  return res.status(200).json({
+    response: "success",
+    message: "Category fetched successfully",
+    data: category,
+  });
+});
 
 // update category
-const updateCategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, status } = req.body;
+const updateCategory = asyncWrapper(async (req, res) => {
+  const { id } = req.params;
+  const { name, status } = req.body;
 
-    // check if category exists
-    const category = await Category.findOne({ where: { id } });
-    if (!category) {
-      return res
-        .status(404)
-        .json({ response: "error", error: "Invalid Category ID" });
-    }
+  // check if category exists
+  const category = await Category.findOne({ where: { id } });
+  if (!category) throw new AppError("Invalid Category ID", 404);
 
-    // validate name
-    if (!name || name.trim() === "") {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Name is required" });
-    }
+  // validate name
+  const requiredError = validateRequiredFields({ Name: name });
+  if (requiredError) throw new AppError(requiredError, 400);
 
-    // if new name already exists for a different category
-    const existingCategory = await Category.findOne({
-      where: { name: name.trim() },
-    });
-    if (existingCategory && existingCategory.id !== parseInt(id)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Category already exist" });
-    }
-
-    // validate status if provided
-    if (status && !["active", "inactive"].includes(status)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Invalid status" });
-    }
-
-    // now update category
-    await Category.update(
-      {
-        name: name.trim(),
-        status: status || category.status,
-      },
-      { where: { id } },
-    );
-
-    return res.status(200).json({ response: "success" });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
+  // if new name already exists for a different category
+  const existingCategory = await Category.findOne({
+    where: { name: name.trim() },
+  });
+  if (existingCategory && existingCategory.id !== parseInt(id)) {
+    throw new AppError("Category already exist", 400);
   }
-};
+
+  // validate status if provided
+  if (status && !["active", "inactive"].includes(status)) {
+    throw new AppError("Invalid status", 400);
+  }
+
+  // now update category
+  await Category.update(
+    {
+      name: name.trim(),
+      status: status || category.status,
+    },
+    { where: { id } },
+  );
+
+  return res.status(200).json({
+    response: "success",
+    message: "Category updated successfully",
+    id: parseInt(id),
+  });
+});
 
 module.exports = {
   getCategories,

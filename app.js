@@ -13,6 +13,25 @@ app.use("/api", require("./routes/category.routes"));
 app.use("/api", require("./routes/vendor.routes"));
 app.use("/api", require("./routes/password.routes"));
 
+// global error handler
+app.use((err, req, res, next) => {
+  // handle invalid JSON body
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({
+      response: "error",
+      message: "Invalid JSON in request body",
+    });
+  }
+
+  // actual global error handler
+  const statusCode = err.statusCode || 500;
+  const message = err.message || "Internal server error";
+  return res.status(statusCode).json({
+    response: "error",
+    message,
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {

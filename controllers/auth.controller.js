@@ -7,349 +7,234 @@ const {
   VendorCategory,
 } = require("../models/index");
 const { sendEmail } = require("../utils/email");
+const {
+  validateRequiredFields,
+  validateEmail,
+  validateMobile,
+  validatePAN,
+  validateGST,
+} = require("../utils/validators");
+const asyncWrapper = require("../utils/asyncWrapper");
+const AppError = require("../utils/AppError");
 
 // login
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+const login = asyncWrapper(async (req, res) => {
+  const { email, password } = req.body;
 
-    // Validation
-    if (!email) {
-      return res.status(400).json({
-        response: "error",
-        error: "Email is required",
-      });
-    }
-    if (!password) {
-      return res.status(400).json({
-        response: "error",
-        error: "Password is required",
-      });
-    }
+  // Validation
+  const requiredError = validateRequiredFields({
+    Email: email,
+    Password: password,
+  });
+  if (requiredError) throw new AppError(requiredError, 400);
 
-    const user = await User.findOne({ where: { email } });
-    if (!user) {
-      return res.status(400).json({
-        response: "error",
-        error: "Invalid credentials",
-      });
-    }
+  const user = await User.findOne({ where: { email } });
+  if (!user) throw new AppError("Invalid credentials", 401);
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        response: "error",
-        error: "Invalid credentials",
-      });
-    }
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) throw new AppError("Invalid credentials", 401);
 
-    // Vendor status check
-    if (user.user_type === "vendor") {
-      const vendorDetail = await VendorDetail.findOne({
-        where: { user_id: user.id },
-      });
-      if (vendorDetail.status !== "approved") {
-        return res.status(400).json({
-          response: "error",
-          error: "Account status Pending",
-        });
-      }
-    }
-
-    const token = jwt.sign(
-      { id: user.id, user_type: user.user_type },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN },
-    );
-
-    return res.status(200).json({
-      response: "success",
-      user_id: user.id,
-      type: user.user_type,
-      name: user.firstname + " " + user.lastname,
-      email: user.email,
-      token,
+  // Vendor status check
+  if (user.user_type === "vendor") {
+    const vendorDetail = await VendorDetail.findOne({
+      where: { user_id: user.id },
     });
-  } catch (error) {
-    return res.status(500).json({
-      response: "error",
-      error: "Internal server error",
-    });
+    if (vendorDetail.status !== "approved")
+      throw new AppError("Account status Pending", 403);
   }
-};
+
+  const token = jwt.sign(
+    { id: user.id, user_type: user.user_type },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN },
+  );
+
+  return res.status(200).json({
+    response: "success",
+    message: "Logged in successfully",
+    id: user.id,
+    type: user.user_type,
+    name: user.firstname + " " + user.lastname,
+    email: user.email,
+    token,
+  });
+});
 
 // register admin
-const registerAdmin = async (req, res) => {
-  try {
-    const { firstname, lastname, email, password, mobile } = req.body;
+const registerAdmin = asyncWrapper(async (req, res) => {
+  const { firstname, lastname, email, password, mobile } = req.body;
 
-    // Validation
-    if (!firstname) {
-      return res.status(400).json({
-        response: "error",
-        error: "Firstname is required",
-      });
-    }
-    if (!lastname) {
-      return res.status(400).json({
-        response: "error",
-        error: "Last name is required",
-      });
-    }
-    if (!email) {
-      return res.status(400).json({
-        response: "error",
-        error: "Email is required",
-      });
-    }
-    if (!password) {
-      return res.status(400).json({
-        response: "error",
-        error: "Password is required",
-      });
-    }
-    if (!mobile) {
-      return res.status(400).json({
-        response: "error",
-        error: "Mobile is required",
-      });
-    }
+  // Required field validations
+  const requiredError = validateRequiredFields({
+    Firstname: firstname,
+    Lastname: lastname,
+    Email: email,
+    Password: password,
+    Mobile: mobile,
+  });
+  if (requiredError) throw new AppError(requiredError, 400);
 
-    // Format validations
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter valid email." });
-    }
+  // Format validations
+  const emailError = validateEmail(email);
+  if (emailError) throw new AppError(emailError, 400);
 
-    const mobileRegex = /^[0-9]{10}$/;
-    if (!mobileRegex.test(mobile)) {
-      return res.status(400).json({
-        response: "error",
-        error: "Enter a valid 10 digit mobile no.",
-      });
-    }
+  const mobileError = validateMobile(mobile);
+  if (mobileError) throw new AppError(mobileError, 400);
 
-    // checks
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        response: "error",
-        error: "User already exist.",
-      });
-    }
+  // checks
+  const existingUser = await User.findOne({ where: { email } });
+  if (existingUser) throw new AppError("User already exist.", 400);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+  // check if mobile already exists
+  const existingMobile = await User.findOne({ where: { mobile } });
+  if (existingMobile)
+    throw new AppError("Mobile number already registered.", 400);
 
-    await User.create({
-      firstname,
-      lastname,
-      email,
-      password: hashedPassword,
-      mobile,
-      user_type: "admin",
-    });
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-    return res.status(201).json({
-      response: "success",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      response: "error",
-      error: "Internal server error",
-    });
-  }
-};
+  const user = await User.create({
+    firstname,
+    lastname,
+    email,
+    password: hashedPassword,
+    mobile,
+    user_type: "admin",
+  });
+
+  return res.status(201).json({
+    response: "success",
+    message: "Admin registered successfully",
+    id: user.id,
+  });
+});
 
 // register vendor
-const registerVendor = async (req, res) => {
-  try {
-    const {
-      firstname,
-      lastname,
-      email,
-      password,
-      mobile,
-      revenue,
-      no_of_employees,
-      pancard_no,
-      gst_no,
-      categories,
-    } = req.body;
+const registerVendor = asyncWrapper(async (req, res) => {
+  const {
+    firstname,
+    lastname,
+    email,
+    password,
+    mobile,
+    revenue,
+    no_of_employees,
+    pancard_no,
+    gst_no,
+    categories,
+  } = req.body;
 
-    // Basic validations
-    if (!firstname) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Firstname is required" });
-    }
-    if (!lastname) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Last name is required" });
-    }
-    if (!email) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Email is required" });
-    }
-    if (!password) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Password is required" });
-    }
-    if (!mobile) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Mobile is required" });
-    }
-    if (!revenue) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Revenue is required" });
-    }
-    if (!no_of_employees) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "No. of employee is required" });
-    }
-    if (!pancard_no) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Pan card is required" });
-    }
-    if (!gst_no) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "GST number is required" });
-    }
-    if (!categories || !Array.isArray(categories) || categories.length === 0) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Category is required" });
-    }
+  // Required field validations
+  const requiredError = validateRequiredFields({
+    Firstname: firstname,
+    Lastname: lastname,
+    Email: email,
+    Password: password,
+    Mobile: mobile,
+    Revenue: revenue,
+    Employees: no_of_employees,
+    Pancard: pancard_no,
+    GST: gst_no,
+  });
+  if (requiredError) throw new AppError(requiredError, 400);
 
-    // Format validations
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter valid email." });
-    }
-
-    const mobileRegex = /^[0-9]{10}$/;
-    if (!mobileRegex.test(mobile)) {
-      return res.status(400).json({
-        response: "error",
-        error: "Enter a valid 10 digit mobile no.",
-      });
-    }
-
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    if (!panRegex.test(pancard_no)) {
-      return res.status(400).json({
-        response: "error",
-        error: "Enter a valid 10 digit PAN card no.",
-      });
-    }
-
-    const gstRegex =
-      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    if (!gstRegex.test(gst_no)) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter a valid GST number." });
-    }
-
-    const revenueArray = revenue.split(",");
-    if (revenueArray.length !== 3) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter last three years revenue." });
-    }
-
-    const revenueData = revenueArray.map((r) => parseInt(r.trim()));
-    if (revenueData.some((r) => isNaN(r))) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Enter valid revenue values." });
-    }
-
-    // email check in db
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "User already exist." });
-    }
-
-    // now we check if all categories that came are valid or not
-    const validCategories = await Category.findAll({
-      where: { id: categories },
-    });
-    if (validCategories.length !== categories.length) {
-      return res
-        .status(400)
-        .json({ response: "error", error: "Select valid categories." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // user
-    const user = await User.create({
-      firstname,
-      lastname,
-      email,
-      password: hashedPassword,
-      mobile,
-      user_type: "vendor",
-    });
-
-    // vendor details
-    await VendorDetail.create({
-      user_id: user.id, // comes from the user we just created
-      revenue: revenueData,
-      no_of_employees,
-      pancard_no,
-      gst_no,
-      status: "pending",
-    });
-
-    // vendor categories
-    const vendorCategories = categories.map((category_id) => ({
-      vendor_id: user.id,
-      category_id,
-    }));
-    await VendorCategory.bulkCreate(vendorCategories);
-
-    // confirmation email
-    try {
-      await sendEmail(
-        email,
-        "Welcome to RFP System",
-        `<p>Hi ${firstname},</p>
-        <p>Thanks for registering on our RFP System. We will review your details and approve your account shortly.</p>
-        <p>Thanks,<br/>Velocity RFP System</p>`,
-      );
-    } catch (emailError) {
-      console.error("Email failed:", emailError);
-    }
-
-    return res.status(201).json({ response: "success" });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ response: "error", error: "Internal server error" });
+  // Categories validation
+  if (!categories || !Array.isArray(categories) || categories.length === 0) {
+    throw new AppError("Category is required", 400);
   }
-};
+
+  // Format validations
+  const emailError = validateEmail(email);
+  if (emailError) throw new AppError(emailError, 400);
+
+  const mobileError = validateMobile(mobile);
+  if (mobileError) throw new AppError(mobileError, 400);
+
+  const panError = validatePAN(pancard_no);
+  if (panError) throw new AppError(panError, 400);
+
+  const gstError = validateGST(gst_no);
+  if (gstError) throw new AppError(gstError, 400);
+
+  const revenueArray = revenue.split(",");
+  if (revenueArray.length !== 3) {
+    throw new AppError("Enter last three years revenue.", 400);
+  }
+
+  const revenueData = revenueArray.map((r) => parseInt(r.trim()));
+  if (revenueData.some((r) => isNaN(r))) {
+    throw new AppError("Enter valid revenue values.", 400);
+  }
+
+  // email check in db
+  const existingUser = await User.findOne({ where: { email } });
+  if (existingUser) throw new AppError("User already exist.", 400);
+
+  // check if mobile already exists
+  const existingMobile = await User.findOne({ where: { mobile } });
+  if (existingMobile)
+    throw new AppError("Mobile number already registered.", 400);
+
+  // now we check if all categories that came are valid or not
+  const validCategories = await Category.findAll({ where: { id: categories } });
+  if (validCategories.length !== categories.length) {
+    throw new AppError("Select valid categories.", 400);
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // user
+  const user = await User.create({
+    firstname,
+    lastname,
+    email,
+    password: hashedPassword,
+    mobile,
+    user_type: "vendor",
+  });
+
+  // vendor details
+  await VendorDetail.create({
+    user_id: user.id,
+    revenue: revenueData,
+    no_of_employees,
+    pancard_no,
+    gst_no,
+    status: "pending",
+  });
+
+  // vendor categories
+  const vendorCategories = categories.map((category_id) => ({
+    vendor_id: user.id,
+    category_id,
+  }));
+  await VendorCategory.bulkCreate(vendorCategories);
+
+  // confirmation email
+  try {
+    await sendEmail(
+      email,
+      "Welcome to RFP System",
+      `<p>Hi ${firstname},</p>
+      <p>Thanks for registering on our RFP System. We will review your details and approve your account shortly.</p>
+      <p>Thanks,<br/>Velocity RFP System</p>`,
+    );
+  } catch (emailError) {
+    console.error("Email failed:", emailError);
+  }
+
+  return res.status(201).json({
+    response: "success",
+    message: "Vendor registered successfully",
+    id: user.id,
+  });
+});
 
 // logout
-const logout = (req, res) => {
+const logout = asyncWrapper(async (req, res) => {
   return res.status(200).json({
     response: "success",
     message: "Logged out successfully",
   });
-};
+});
 
 module.exports = { login, registerAdmin, registerVendor, logout };
