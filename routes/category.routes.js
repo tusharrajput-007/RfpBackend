@@ -6,10 +6,12 @@ const {
   deleteCategory,
   getCategoryById,
   updateCategory,
+  getActiveCategories,
 } = require("../controllers/category.controller");
 const { verifyToken } = require("../middleware/auth.middleware");
 const { isAdmin } = require("../middleware/admin.middleware");
 
+router.get("/categories/all", getActiveCategories);
 router.get("/categories", getCategories);
 router.post("/categories", verifyToken, isAdmin, addCategory);
 router.delete("/categories/:id", verifyToken, isAdmin, deleteCategory);

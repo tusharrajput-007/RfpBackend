@@ -16,6 +16,7 @@ const {
 } = require("../utils/validators");
 const asyncWrapper = require("../utils/asyncWrapper");
 const AppError = require("../utils/AppError");
+const { Op } = require("sequelize");
 
 // create rfp
 const createRfp = asyncWrapper(async (req, res) => {
@@ -323,10 +324,16 @@ const getRfpDetails = asyncWrapper(async (req, res) => {
 
 // get all rfps
 const getAllRfps = asyncWrapper(async (req, res) => {
-  const { page, limit } = req.query;
+  const { page, limit, item_name, status } = req.query;
   const { limit: parsedLimit, offset } = getPagination(page, limit);
 
+  // where clause based on filters
+  const where = {};
+  if (item_name) where.item_name = { [Op.like]: `%${item_name}%` };
+  if (status) where.status = status;
+
   const data = await Rfp.findAndCountAll({
+    where,
     limit: parsedLimit,
     offset,
     order: [["createdAt", "DESC"]],

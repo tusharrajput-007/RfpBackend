@@ -3,13 +3,20 @@ const { Category, VendorCategory, RfpCategory } = require("../models/index");
 const { validateRequiredFields } = require("../utils/validators");
 const asyncWrapper = require("../utils/asyncWrapper");
 const AppError = require("../utils/AppError");
+const { Op } = require("sequelize");
 
 // get all categories
 const getCategories = asyncWrapper(async (req, res) => {
-  const { page, limit } = req.query;
+  const { page, limit, name, status } = req.query;
   const { limit: parsedLimit, offset } = getPagination(page, limit);
 
+  // where clause based on filters
+  const where = {};
+  if (name) where.name = { [Op.like]: `%${name}%` };
+  if (status) where.status = status;
+
   const data = await Category.findAndCountAll({
+    where,
     attributes: ["id", "name", "status"],
     limit: parsedLimit,
     offset,
@@ -142,10 +149,26 @@ const updateCategory = asyncWrapper(async (req, res) => {
   });
 });
 
+// get all active categories for dropdown
+const getActiveCategories = asyncWrapper(async (req, res) => {
+  const categories = await Category.findAll({
+    where: { status: "active" },
+    attributes: ["id", "name"],
+    order: [["name", "ASC"]],
+  });
+
+  return res.status(200).json({
+    response: "success",
+    message: "Active categories fetched successfully",
+    data: categories,
+  });
+});
+
 module.exports = {
   getCategories,
   addCategory,
   deleteCategory,
   getCategoryById,
   updateCategory,
+  getActiveCategories,
 };

@@ -88,12 +88,16 @@ const forgotPassword = asyncWrapper(async (req, res) => {
   });
 });
 
-// confirm otp
+// confirm otp and reset password
 const confirmOtp = asyncWrapper(async (req, res) => {
-  const { email, otp } = req.body;
+  const { email, otp, new_password } = req.body;
 
   // Required field validations
-  const requiredError = validateRequiredFields({ Email: email, OTP: otp });
+  const requiredError = validateRequiredFields({
+    Email: email,
+    OTP: otp,
+    "New password": new_password,
+  });
   if (requiredError) throw new AppError(requiredError, 400);
 
   // email format validation
@@ -120,9 +124,13 @@ const confirmOtp = asyncWrapper(async (req, res) => {
   // delete OTP after successful verification
   await Otp.destroy({ where: { email } });
 
+  // hash new password and update
+  const hashedPassword = await bcrypt.hash(new_password, 10);
+  await User.update({ password: hashedPassword }, { where: { email } });
+
   return res.status(200).json({
     response: "success",
-    message: "OTP verified successfully",
+    message: "Password reset successfully",
     id: user.id,
   });
 });

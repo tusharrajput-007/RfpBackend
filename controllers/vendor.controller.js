@@ -9,19 +9,33 @@ const asyncWrapper = require("../utils/asyncWrapper");
 const AppError = require("../utils/AppError");
 const { sendEmail } = require("../utils/email");
 const { validateRequiredFields } = require("../utils/validators");
+const { Op } = require("sequelize");
 
 // get all vendors
 const getVendors = asyncWrapper(async (req, res) => {
-  const { page, limit } = req.query;
+  const { page, limit, name, status } = req.query;
   const { limit: parsedLimit, offset } = getPagination(page, limit);
 
+  // vendor detail where clause for status filter
+  const vendorDetailWhere = {};
+  if (status) vendorDetailWhere.status = status;
+
+  // user where clause for name filter
+  const userWhere = { user_type: "vendor" };
+  if (name)
+    userWhere[Op.or] = [
+      { firstname: { [Op.like]: `%${name}%` } },
+      { lastname: { [Op.like]: `%${name}%` } },
+    ];
+
   const data = await User.findAndCountAll({
-    where: { user_type: "vendor" },
+    where: userWhere,
     attributes: ["id", "firstname", "lastname", "email", "mobile"],
     include: [
       {
         model: VendorDetail,
         attributes: ["no_of_employees", "status"],
+        where: vendorDetailWhere,
       },
     ],
     limit: parsedLimit,
