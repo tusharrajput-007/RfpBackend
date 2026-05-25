@@ -39,6 +39,11 @@ const login = asyncWrapper(async (req, res) => {
     const vendorDetail = await VendorDetail.findOne({
       where: { user_id: user.id },
     });
+    if (!vendorDetail)
+      throw new AppError(
+        "Vendor details not found. Please contact admin.",
+        403,
+      );
     if (vendorDetail.status !== "approved")
       throw new AppError("Account status Pending", 403);
   }

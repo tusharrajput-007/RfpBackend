@@ -21,6 +21,6 @@ router.get("/getallrfps", verifyToken, isAdmin, getAllRfps);
 router.get("/quotes/:id", verifyToken, isAdmin, getRfpQuotes);
 router.put("/closerfp/:id", verifyToken, isAdmin, closeRfp);
 router.put("/apply/:id", verifyToken, isVendor, applyForRfp);
-router.get("/vendor/:userId", verifyToken, isVendor, getRfpsByVendor);
+router.get('/vendor', verifyToken, isVendor, getRfpsByVendor)
 
 module.exports = router;

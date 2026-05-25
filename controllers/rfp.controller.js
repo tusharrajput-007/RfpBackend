@@ -371,8 +371,6 @@ const getRfpQuotes = asyncWrapper(async (req, res) => {
     offset,
   });
 
-  if (data.count === 0) throw new AppError("No quotes available", 404);
-
   const quotes = data.rows.map((row) => ({
     vendor_id: row.vendor_id,
     name: row.User.firstname + " " + row.User.lastname,
@@ -480,16 +478,17 @@ const applyForRfp = asyncWrapper(async (req, res) => {
 
   // send email to admin
   const admin = await User.findOne({ where: { id: rfp.admin_id } });
+  const vendor = await User.findOne({ where: { id: req.user.id } });
   try {
     await sendEmail(
-      admin.email,
-      "New Quote Submitted on RFP",
-      `<p>Hi Admin,</p>
-      <p>Vendor "${req.user.firstname}" has submitted a quote for the RFP named "${rfp.item_name}".</p>
-      <p>Quote Price: Rs. ${item_price}</p>
-      <p>Total Cost: Rs. ${total_cost}</p>
-      <p>Quote Date: ${new Date().toLocaleDateString()}</p>
-      <p>Thanks,<br/>Velocity RFP System</p>`,
+        admin.email,
+        "New Quote Submitted on RFP",
+        `<p>Hi Admin,</p>
+        <p>Vendor "${vendor.firstname} ${vendor.lastname}" has submitted a quote for the RFP named "${rfp.item_name}".</p>
+        <p>Quote Price: Rs. ${item_price}</p>
+        <p>Total Cost: Rs. ${total_cost}</p>
+        <p>Quote Date: ${new Date().toLocaleDateString()}</p>
+        <p>Thanks,<br/>Velocity RFP System</p>`
     );
   } catch (emailError) {
     console.error("Email failed:", emailError);
@@ -504,19 +503,13 @@ const applyForRfp = asyncWrapper(async (req, res) => {
 
 // get rfps by vendor id
 const getRfpsByVendor = asyncWrapper(async (req, res) => {
-  const { userId } = req.params;
+  const vendorId = req.user.id  // logged in user's id
   const { page, limit } = req.query;
   const { limit: parsedLimit, offset } = getPagination(page, limit);
 
-  // check if user exists
-  const user = await User.findOne({
-    where: { id: userId, user_type: "vendor" },
-  });
-  if (!user) throw new AppError("Invalid user ID", 404);
-
   // fetch rfps assigned to this vendor with full rfp details
   const data = await RfpVendor.findAndCountAll({
-    where: { vendor_id: userId },
+    where: { vendor_id: vendorId },
     include: [
       {
         model: Rfp,
@@ -536,8 +529,6 @@ const getRfpsByVendor = asyncWrapper(async (req, res) => {
     limit: parsedLimit,
     offset,
   });
-
-  if (data.count === 0) throw new AppError("No RFPs found", 404);
 
   const rfps = data.rows.map((row) => ({
     rfp_id: row.rfp_id,

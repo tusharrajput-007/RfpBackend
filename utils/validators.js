@@ -46,9 +46,13 @@ const validateQuantity = (quantity) => {
 };
 
 const validatePriceRange = (minimum_price, maximum_price) => {
-  if (parseFloat(minimum_price) >= parseFloat(maximum_price))
-    return "Minimum price should be less than maximum price.";
-  return null;
+    if (parseFloat(minimum_price) <= 0)
+        return "Minimum price must be a positive number."
+    if (parseFloat(maximum_price) <= 0)
+        return "Maximum price must be a positive number."
+    if (parseFloat(minimum_price) >= parseFloat(maximum_price))
+        return "Minimum price should be less than maximum price."
+    return null
 };
 
 module.exports = {

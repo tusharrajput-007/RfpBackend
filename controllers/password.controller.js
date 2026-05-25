@@ -59,7 +59,17 @@ const forgotPassword = asyncWrapper(async (req, res) => {
 
   // check if email exists
   const user = await User.findOne({ where: { email } });
-  if (!user) throw new AppError("Invalid credentials", 401);
+
+  // always return same message whether email exists or not (prevents email enumeration)
+  if (!user) {
+    return res.status(200).json({
+      response: "success",
+      message: "If this email is registered, an OTP has been sent.",
+    });
+  }
+
+  // delete all existing OTPs for this email before creating new one
+  await Otp.destroy({ where: { email } });
 
   // generate 4 digit OTP
   const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -73,9 +83,9 @@ const forgotPassword = asyncWrapper(async (req, res) => {
       email,
       "RFP System - Password Reset OTP",
       `<p>Hi ${user.firstname},</p>
-            <p>Your OTP for password reset is: <strong>${otp}</strong></p>
-            <p>This OTP is valid for 10 minutes.</p>
-            <p>Thanks,<br/>Velocity RFP System</p>`,
+      <p>Your OTP for password reset is: <strong>${otp}</strong></p>
+      <p>This OTP is valid for 10 minutes.</p>
+      <p>Thanks,<br/>Velocity RFP System</p>`,
     );
   } catch (emailError) {
     console.error("Email failed:", emailError);
@@ -83,8 +93,7 @@ const forgotPassword = asyncWrapper(async (req, res) => {
 
   return res.status(200).json({
     response: "success",
-    message: "OTP sent to your email address",
-    id: user.id,
+    message: "If this email is registered, an OTP has been sent.",
   });
 });
 

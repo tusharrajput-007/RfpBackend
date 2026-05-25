@@ -93,13 +93,6 @@ const getVendorsByCategory = asyncWrapper(async (req, res) => {
     offset,
   });
 
-  if (data.count === 0) {
-    return res.status(200).json({
-      response: "success",
-      message: "No vendors mapped with the category.",
-    });
-  }
-
   const vendors = data.rows.map((row) => ({
     user_id: row.User.id,
     name: row.User.firstname + " " + row.User.lastname,
@@ -117,7 +110,7 @@ const getVendorsByCategory = asyncWrapper(async (req, res) => {
 
   return res.status(200).json({
     response: "success",
-    message: "Vendors fetched successfully",
+    message: data.count === 0 ? "No vendors mapped with the category." : "Vendors fetched successfully",
     ...response,
   });
 });
